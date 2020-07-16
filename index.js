@@ -1,129 +1,114 @@
+const debug = require("debug")("BugTracker:startup");
+const mongoose = require("mongoose");
+//set DEBUG=BugTracker:startup,BugTracker:db || BugTracker:*
+//set DEBUG=BugTracker:startup nodemon index.js
+// const dbDebugger = require("debug")("BugTracker:db");
+const config = require("config");
 const morgan = require("morgan");
 const helmet = require("helmet");
-const Joi = require("joi");
+
+const tickets = require("./routes/tickets");
+const home = require("./routes/home");
 const express = require("express");
 const app = express();
-
+mongoose
+  .connect(config.get("mongodb.server"), {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => debug("Connected to MongoDb"))
+  .catch((err) => console.error("Could not connect to mongoDB..."));
 app.use(express.json());
 app.use(helmet());
-app.use(morgan("tiny"));
-
-const tickets = [
-  {
-    id: 1,
-    title: "hallo",
-    description: "world",
-    project: "test project",
-    created: "",
-    updated: "",
-    assigenedTo: "",
-    attachment: "",
-    priority: "low, medium,high, critical",
-    type: "error report, feature request, service request, other",
-    owner: "",
-    history: "",
-  },
-  {
-    id: 2,
-    title: "hallo2",
-    description: "world 2",
-    project: "test project 2",
-    created: "",
-    updated: "",
-    assigenedTo: "",
-    attachment: "",
-    priority: "low, medium,high, critical",
-    type: "error report, feature request, service request, other",
-    owner: "",
-    history: "",
-  },
-  {
-    id: 3,
-    title: "hallo3",
-    description: "world 3",
-    project: "test project 2",
-    created: "",
-    updated: "",
-    assigenedTo: "",
-    attachment: "",
-    priority: "low, medium,high, critical",
-    type: "error report, feature request, service request, other",
-    owner: "",
-    history: "",
-  },
-  {
-    id: 4,
-    title: "hallo4",
-    description: "world 4",
-    project: "test project 2",
-    created: "",
-    updated: "",
-    assigenedTo: "",
-    attachment: "",
-    priority: "low, medium,high, critical",
-    type: "error report, feature request, service request, other",
-    owner: "",
-    history: "",
-  },
-];
-
-app.get("/", (req, res) => {
-  res.send("hallo world");
+app.use("/api/tickets", tickets);
+app.use("/", home);
+const ticketSchema = new mongoose.Schema({
+  title: String,
+  description: String,
+  project: String,
+  created: { type: Date, default: Date.now },
+  updated: { type: Date, default: Date.now },
+  assigenedTo: [String],
+  attachment: [String],
+  priority: String,
+  type: String,
+  owner: String,
+  history: [String],
 });
-app.get("/api/tickets", (req, res) => {
-  res.send(tickets);
-});
-app.get("/api/tickets/:id", (req, res) => {
-  const ticket = tickets.find((t) => t.id === parseInt(req.params.id));
-  if (!ticket)
-    return res.status(404).send("Ticket with the given ID was not found");
-  res.send(ticket);
-});
-app.post("/api/tickets", (req, res) => {
-  const { error } = validateTicket(req.body);
-  if (error) return res.status(400).send(error.details[0].message);
-  const ticket = {
-    ...tickets[0],
-    id: tickets.length + 1,
-    title: req.body.title,
-    description: req.body.description,
-    project: `project${tickets.length + 1}`,
-  };
-  tickets.push(ticket);
-  res.send(ticket);
-});
+const Ticket = mongoose.model("ticket", ticketSchema);
 
-app.put("/api/tickets/:id", (req, res) => {
-  const ticket = tickets.find((t) => t.id === parseInt(req.params.id));
-  if (!ticket)
-    return res.status(404).send("Ticket with the given ID was not found");
+async function createTicket() {
+  const ticket = new Ticket({
+    title: "world",
+    description: "this is",
+    project: "meeaaww",
+    assigenedTo: ["usera", "user b"],
+    attachment: [],
+    priority: "high",
+    type: "feature request",
+    owner: "usera",
+    history: [""],
+  });
 
-  const { error } = validateTicket(req.body);
-  if (error) return res.status(400).send(error.details[0].message);
+  const result = await ticket.save();
+  debug(result);
+}
+async function getTickets() {
+  const pageNumber = 1;
+  const pageSize = 10;
+  const tickets = await Ticket.find({ priority: "high" })
+    .skip((pageNumber - 1) * pageSize)
+    .limit(pageSize)
+    .sort({ title: 1 }) //1 asc -1 dsc
+    .select({ title: 1, description: 1, project: 1 });
+  // .countDocuments();
+  debug(tickets);
+}
+async function updateTicket(id) {
+  // const ticket = await Ticket.findById(id);
+  // if (!ticket) return;
+  // ticket.set({
+  //   title: "new title",
+  //   project: "new project",
+  // });
+  // const result = await ticket.save();
 
-  ticket.title = req.body.title;
-  ticket.description = req.body.description;
-  res.send(ticket);
-});
+  // const result = await Ticket.updateOne(
+  //   { _id: id },
+  //   {
+  //     $set: {
+  //       title: "new title new",
+  //       project: "new project new",
+  //     },
+  //   }
+  // );
 
-app.delete("/api/tickets/:id", (req, res) => {
-  const ticket = tickets.find((t) => t.id === parseInt(req.params.id));
-  if (!ticket)
-    return res.status(404).send("Ticket with the given ID was not found");
+  const ticket = await Ticket.findByIdAndUpdate(
+    id,
+    {
+      $set: {
+        title: "new2",
+        project: "new2  new",
+      },
+    },
+    { new: true }
+  );
 
-  const index = tickets.indexOf(ticket);
-  tickets.splice(index, 1);
+  debug(ticket);
+}
+async function removeTicket(id) {
+  const result = await Ticket.deleteOne({ _id: id });
+  debug(result);
+}
+// createTicket();
+// getTickets();
+// updateTicket("5f0fb91b5ac9095664ea0368");
+removeTicket("5f0fb91b5ac9095664ea0368");
 
-  res.send(ticket);
-});
+if (app.get("env") === "development") {
+  app.use(morgan("tiny"));
+  debug(`Morgan enabled`);
+}
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`listening on port ${port}...`));
-
-validateTicket = (ticket) => {
-  const schema = {
-    title: Joi.string().min(3).required(),
-    description: Joi.string().min(3).required(),
-  };
-  return Joi.validate(ticket, schema);
-};
