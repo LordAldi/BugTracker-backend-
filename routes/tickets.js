@@ -57,7 +57,7 @@ async function getTickets(query) {
   const tickets = await Ticket.find()
     .skip((pageNumber - 1) * pageSize)
     .limit(pageSize)
-    .sort({ title: 1 }); //1 asc -1 dsc
+    .sort({ updated: 1 }); //1 asc -1 dsc
   // .select({ title: 1, description: 1, project: 1 });
   // .countDocuments();
   return tickets;
@@ -67,20 +67,16 @@ async function getTicketById(id) {
   return ticket;
 }
 async function updateTicket(id, data) {
-  const ticket = await Ticket.findByIdAndUpdate(
-    id,
-    {
-      $set: {
-        ...data,
-      },
-    },
+  const ticket = await Ticket.findOneAndUpdate(
+    { _id: id },
+    { ...data },
     { new: true }
   );
 
   return ticket;
 }
 async function removeTicket(id) {
-  const ticket = await Ticket.findByIdAndRemove(id);
+  const ticket = await Ticket.findOneAndRemove({ _id: id });
   return ticket;
 }
 
@@ -111,13 +107,11 @@ router.put("/:id", async (req, res) => {
   const { error } = validateUpdateTicket(req.body);
   if (error) return res.status(400).send(error.details[0].message);
 
-  const ticket = await updateTicket(req.params.id, req.body);
-
-  if (!ticket)
-    return res.status(404).send("Ticket with the given ID was not found");
-
   try {
-    console.log("try");
+    const ticket = await updateTicket(req.params.id, req.body);
+
+    if (!ticket)
+      return res.status(404).send("Ticket with the given ID was not found");
     res.send(ticket);
   } catch (ex) {
     for (field in ex.errors) res.send(ex.errors[field].message);
@@ -125,13 +119,11 @@ router.put("/:id", async (req, res) => {
 });
 
 router.delete("/:id", async (req, res) => {
-  const ticket = await removeTicket(req.params.id);
-  if (!ticket)
-    return res.status(404).send("Ticket with the given ID was not found");
-
   try {
-    ticket = await ticket.save();
-    res.send(ticket);
+    const ticket = await removeTicket(req.params.id);
+    if (!ticket)
+      return res.status(404).send("Ticket with the given ID was not found");
+    res.send({ ...ticket._doc, message: "Ticket deleted successfully" });
   } catch (ex) {
     for (field in ex.errors) res.send(ex.errors[field].message);
   }
@@ -144,8 +136,12 @@ validateTicket = (ticket) => {
     project: Joi.string().min(3).required(),
     assigenedTo: Joi.array(),
     attachment: Joi.array(),
-    priority: Joi.string().required(),
-    type: Joi.string().required(),
+    priority: Joi.string()
+      .valid(["low", "medium", "high", "critical"])
+      .required(),
+    type: Joi.string()
+      .valid(["error report", "feature request", "service request", "other"])
+      .required(),
     owner: Joi.string().required(),
   };
   return Joi.validate(ticket, schema);
@@ -157,8 +153,13 @@ validateUpdateTicket = (ticket) => {
     project: Joi.string().min(3),
     assigenedTo: Joi.array(),
     attachment: Joi.array(),
-    priority: Joi.string(),
-    type: Joi.string(),
+    priority: Joi.string().valid(["low", "medium", "high", "critical"]),
+    type: Joi.string().valid([
+      "error report",
+      "feature request",
+      "service request",
+      "other",
+    ]),
     owner: Joi.string(),
   };
   return Joi.validate(ticket, schema);

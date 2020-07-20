@@ -8,6 +8,7 @@ const morgan = require("morgan");
 const helmet = require("helmet");
 
 const tickets = require("./routes/tickets");
+const projects = require("./routes/projects");
 const home = require("./routes/home");
 const express = require("express");
 const app = express();
@@ -22,6 +23,7 @@ mongoose
 app.use(express.json());
 app.use(helmet());
 app.use("/api/tickets", tickets);
+app.use("/api/projects", projects);
 app.use("/", home);
 
 // createTicket();
