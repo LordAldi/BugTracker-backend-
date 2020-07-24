@@ -1,20 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const Joi = require("joi");
-const mongoose = require("mongoose");
+const { Project, validate, validateUpdate } = require("../models/project");
 
-const projectSchema = new mongoose.Schema({
-  name: { type: String, required: true, minlength: 3 },
-  description: String,
-  created: { type: Date, default: Date.now },
-  createdBy: { type: String, required: true },
-  modified: { type: Date, default: Date.now },
-  modifiedBy: { type: String, required: true },
-  targetEnd: { type: Date },
-  actualEnd: { type: Date },
-  isFinish: { type: Boolean, required: true, default: false },
-});
-const Project = mongoose.model("project", projectSchema);
 async function createProject(data) {
   //   const { name, description, createdBy, modifiedBy, targetEnd } = data;
   const project = new Project({
@@ -62,7 +49,7 @@ router.get("/:id", async (req, res) => {
   res.send(project);
 });
 router.post("/", async (req, res) => {
-  const { error } = validateProject(req.body);
+  const { error } = validate(req.body);
   if (error) return res.status(400).send(error.details[0].message);
 
   let project = await createProject(req.body);
@@ -75,7 +62,7 @@ router.post("/", async (req, res) => {
 });
 
 router.put("/:id", async (req, res) => {
-  const { error } = validateUpdateProject(req.body);
+  const { error } = validateUpdate(req.body);
   if (error) return res.status(400).send(error.details[0].message);
 
   try {
@@ -100,22 +87,4 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-validateProject = (project) => {
-  const schema = {
-    name: Joi.string().min(3).required(),
-    description: Joi.string(),
-    createdBy: Joi.string().required(),
-    modifiedBy: Joi.string().required(),
-  };
-  return Joi.validate(project, schema);
-};
-validateUpdateProject = (project) => {
-  const schema = {
-    name: Joi.string().min(3),
-    description: Joi.string(),
-    modifiedBy: Joi.string().required(),
-    isFinish: Joi.bool(),
-  };
-  return Joi.validate(project, schema);
-};
 module.exports = router;
